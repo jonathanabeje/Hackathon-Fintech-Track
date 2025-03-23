@@ -7,6 +7,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import os
 from PIL import Image
+import re
 import random
 import json
 import base64
@@ -32,30 +33,31 @@ if 'page' not in st.session_state:
 
 # Tool type to image mapping
 def get_tool_image_url(tool_type):
-    """Get an image URL based on tool type"""
-    tool_image_map = {
-        "Power Drill": "https://cdn.pixabay.com/photo/2016/10/05/08/57/drill-1710332_960_720.jpg",
-        "Circular Saw": "https://cdn.pixabay.com/photo/2016/03/27/21/32/circular-saw-1281730_960_720.jpg",
-        "Lawn Mower": "https://cdn.pixabay.com/photo/2017/04/02/21/06/gardening-2199526_960_720.jpg",
-        "Pressure Washer": "https://cdn.pixabay.com/photo/2018/10/06/08/09/pressure-washer-3728199_960_720.jpg",
-        "Leaf Blower": "https://cdn.pixabay.com/photo/2016/10/05/14/26/leaf-blower-1720536_960_720.jpg",
-        "Hedge Trimmer": "https://cdn.pixabay.com/photo/2015/03/21/22/33/hedge-trimmer-684941_960_720.jpg",
-        "Ladder": "https://cdn.pixabay.com/photo/2018/06/04/02/15/ladder-3453397_960_720.jpg",
-        "Chain Saw": "https://cdn.pixabay.com/photo/2021/09/18/14/37/chainsaw-6635616_960_720.jpg",
-        "Sander": "https://cdn.pixabay.com/photo/2019/02/18/12/37/sander-4004617_960_720.jpg",
-        "Nail Gun": "https://cdn.pixabay.com/photo/2014/12/08/16/18/hammer-560831_960_720.jpg",
-        "Air Compressor": "https://cdn.pixabay.com/photo/2020/05/02/17/18/compressor-5122186_960_720.jpg",
-        "Generator": "https://cdn.pixabay.com/photo/2020/12/18/06/24/generator-5841302_960_720.jpg",
-        "Router": "https://cdn.pixabay.com/photo/2017/02/14/15/26/router-2066385_960_720.jpg",
-        "Planer": "https://cdn.pixabay.com/photo/2016/04/27/03/02/wood-planer-1355818_960_720.jpg",
-        "Jigsaw": "https://cdn.pixabay.com/photo/2015/03/19/02/51/jigsaw-680741_960_720.jpg",
-        "Rotary Hammer": "https://cdn.pixabay.com/photo/2017/06/06/21/37/drill-2378341_960_720.jpg",
-        "Tile Cutter": "https://cdn.pixabay.com/photo/2017/02/08/09/56/angle-grinder-2048422_960_720.jpg",
-        "Paint Sprayer": "https://cdn.pixabay.com/photo/2013/04/01/09/07/paint-gun-98435_960_720.jpg"
+    """Return local image path based on tool type"""
+    image_map = {
+        "Power Drill": "powerdrillsnew.jpg",
+        "Circular Saw": "circularsawnew.jpg",
+        "Lawn Mower": "lawnmower.jpg",
+        "Pressure Washer": "pressurewashernew.jpg",
+        "Leaf Blower": "leaferblowernew.jpg",
+        "Hedge Trimmer": "hdegetrimmernew.jpg",
+        "Ladder": "laddernew.jpg",
+        "Chain Saw": "chainsawnew.jpg",
+        "Sander": "sandernew.jpg",
+        "Nail Gun": "nailgunnew.jpg",
+        "Air Compressor": "aircompressor.jpg",
+        "Generator": "generatornew.jpg",
+        "Router": "routeroolnew.jpg",
+        "Planer": "planernew.jpg",
+        "Jigsaw": "jigsawnew.jpg",
+        "Rotary Hammer": "rotaryhammernew.jpg",
+        "Tile Cutter": "tilercutternew.jpg",
+        "Paint Sprayer": "paintsprayernew.jpg"
     }
-    # Fallback image for any tool type not in the map
-    fallback_image_url = "https://cdn.pixabay.com/photo/2016/12/19/14/59/tool-1916386_960_720.jpg"
-    return tool_image_map.get(tool_type, fallback_image_url)
+
+    filename = image_map.get(tool_type, None)
+    if filename:
+        return os.path.join("images", filename)
 
 
 # Function to load data (mock data for the hackathon)
@@ -325,6 +327,10 @@ with st.sidebar:
         if st.button("📚 My Bookings", use_container_width=True):
             st.session_state.page = 'bookings'
             st.rerun()
+        
+        if st.button("🔄 Tool Swap", use_container_width=True):
+            st.session_state.page = 'tool_swap'
+            st.rerun()
 
     st.divider()
     st.header("About")
@@ -338,12 +344,18 @@ with st.sidebar:
 def render_tool_card(tool, col):
     """Render a tool card using Streamlit components"""
     with col:
-        # Display the actual image
-        st.image(
-            tool["image_url"],
-            caption=f"{tool['brand']} {tool['tool_type']}",
-            use_column_width=True
-        )
+        image_path = tool.get("image_url", "images/default.jpg")
+
+        # Try loading the image
+        try:
+            st.image(
+                image_path,
+                caption=f"{tool['brand']} {tool['tool_type']}",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.warning("⚠️ Could not load image.")
+            st.image("images/default.jpg", caption="Image Not Found", use_container_width=True)
 
         # Tool details
         st.subheader(tool['title'])
@@ -355,7 +367,6 @@ def render_tool_card(tool, col):
             st.session_state.selected_tool = tool['id']
             st.session_state.page = 'tool_details'
             st.rerun()
-
 
 # Home page
 def show_home_page():
@@ -955,6 +966,182 @@ def show_profile():
 
                     st.divider()
 
+def load_tool_swap_data():
+    """Load or initialize tool swap requests"""
+    if os.path.exists('data/tool_swaps.csv'):
+        return pd.read_csv('data/tool_swaps.csv')
+    else:
+        swap_df = pd.DataFrame(columns=[
+            "id", 
+            "proposer_username", 
+            "proposer_tool_id", 
+            "receiver_username", 
+            "receiver_tool_id", 
+            "status", 
+            "proposed_date", 
+            "accepted_date"
+        ])
+        swap_df.to_csv('data/tool_swaps.csv', index=False)
+        return swap_df
+
+def create_tool_swap_request(proposer_username, proposer_tool_id, receiver_username, receiver_tool_id):
+    """Create a new tool swap request"""
+    swap_df = load_tool_swap_data()
+    
+    # Generate unique swap ID
+    swap_id = len(swap_df) + 1
+    
+    # Create new swap request
+    new_swap = pd.DataFrame([{
+        "id": swap_id,
+        "proposer_username": proposer_username,
+        "proposer_tool_id": proposer_tool_id,
+        "receiver_username": receiver_username,
+        "receiver_tool_id": receiver_tool_id,
+        "status": "Pending",
+        "proposed_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "accepted_date": None
+    }])
+    
+    # Append to swap dataframe
+    updated_swap_df = pd.concat([swap_df, new_swap], ignore_index=True)
+    updated_swap_df.to_csv('data/tool_swaps.csv', index=False)
+    
+    return swap_id
+
+def show_tool_swap_page():
+    """Render the Tool Swap page"""
+    # Ensure user is logged in
+    if not st.session_state.user_logged_in:
+        st.warning("Please log in to access the Tool Swap Network.")
+        return
+    
+    # Load necessary data
+    tools_df = load_tool_data()
+    swap_df = load_tool_swap_data()
+    current_user = st.session_state.current_user
+    
+    # Get current user's tools
+    user_tools = tools_df[tools_df['owner_username'] == current_user]
+    
+    st.title("🔄 Tool Swap Network")
+    
+    # Tabs for different swap interactions
+    tab1, tab2, tab3 = st.tabs([
+        "Propose Swap", 
+        "My Swap Requests", 
+        "Incoming Swap Requests"
+    ])
+    
+    with tab1:
+        st.subheader("Propose a Tool Swap")
+        
+        # Select the user's tool to swap
+        st.write("Select the tool you want to swap:")
+        if user_tools.empty:
+            st.info("You need to list a tool first before proposing a swap.")
+        else:
+            user_tool_options = user_tools.apply(lambda row: f"{row['title']} (ID: {row['id']})", axis=1)
+            selected_user_tool = st.selectbox("Your Tool", user_tool_options)
+            user_tool_id = int(selected_user_tool.split("(ID: ")[-1].strip(")"))
+            
+            # Find potential swap tools (excluding user's own tools)
+            swap_candidate_tools = tools_df[
+                (tools_df['owner_username'] != current_user) & 
+                (tools_df['available'] == True)
+            ]
+            
+            # Prepare tool selection
+            tool_options = swap_candidate_tools.apply(
+                lambda row: f"{row['title']} (Owner: {row['owner_username']}, ID: {row['id']})", 
+                axis=1
+            )
+            
+            swap_candidate_tools = tools_df[
+        (tools_df['owner_username'] != current_user) & 
+        (tools_df['available'] == True)
+    ]
+            tool_options = swap_candidate_tools.apply(
+        lambda row: f"{row['title']} (Owner: {row['owner_username']}, ID: {row['id']})", 
+        axis=1
+)
+            selected_swap_tool = st.selectbox("Tool to Swap With", tool_options)
+            swap_tool_id = int(re.search(r'\(ID: (\d+)\)', selected_swap_tool).group(1))
+            receiver_username = re.search(r'\(Owner: (.*?),', selected_swap_tool).group(1)
+            # Swap proposal button
+            if st.button("Propose Swap"):
+                # Create swap request
+                swap_id = create_tool_swap_request(
+                    current_user, 
+                    user_tool_id, 
+                    receiver_username, 
+                    swap_tool_id
+                )
+                
+                st.success(f"Swap request sent! Request ID: {swap_id}")
+    
+    with tab2:
+        st.subheader("My Swap Requests")
+        
+        # Outgoing swap requests
+        outgoing_swaps = swap_df[swap_df['proposer_username'] == current_user]
+        
+        if outgoing_swaps.empty:
+            st.info("You haven't made any swap requests yet.")
+        else:
+            for _, swap in outgoing_swaps.iterrows():
+                proposer_tool = tools_df[tools_df['id'] == swap['proposer_tool_id']].iloc[0]
+                receiver_tool = tools_df[tools_df['id'] == swap['receiver_tool_id']].iloc[0]
+                
+                with st.container():
+                    st.write(f"**Swap Request to {swap['receiver_username']}**")
+                    st.write(f"Your Tool: {proposer_tool['title']}")
+                    st.write(f"Requested Tool: {receiver_tool['title']}")
+                    st.write(f"Status: {swap['status']}")
+                    st.write(f"Proposed Date: {swap['proposed_date']}")
+                    st.divider()
+    
+    with tab3:
+        st.subheader("Incoming Swap Requests")
+        
+        # Incoming swap requests
+        incoming_swaps = swap_df[swap_df['receiver_username'] == current_user]
+        
+        if incoming_swaps.empty:
+            st.info("You have no incoming swap requests.")
+        else:
+            for _, swap in incoming_swaps.iterrows():
+                proposer_tool = tools_df[tools_df['id'] == swap['proposer_tool_id']].iloc[0]
+                receiver_tool = tools_df[tools_df['id'] == swap['receiver_tool_id']].iloc[0]
+                
+                with st.container():
+                    st.write(f"**Swap Request from {swap['proposer_username']}**")
+                    st.write(f"Their Tool: {proposer_tool['title']}")
+                    st.write(f"Your Tool: {receiver_tool['title']}")
+                    st.write(f"Status: {swap['status']}")
+                    st.write(f"Proposed Date: {swap['proposed_date']}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(f"Accept Swap {swap['id']}", key=f"accept_{swap['id']}"):
+                            # Update swap status
+                            swap_df = load_tool_swap_data()
+                            swap_df.loc[swap_df['id'] == swap['id'], 'status'] = 'Accepted'
+                            swap_df.loc[swap_df['id'] == swap['id'], 'accepted_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            swap_df.to_csv('data/tool_swaps.csv', index=False)
+                            st.success("Swap accepted!")
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button(f"Decline Swap {swap['id']}", key=f"decline_{swap['id']}"):
+                            # Update swap status
+                            swap_df = load_tool_swap_data()
+                            swap_df.loc[swap_df['id'] == swap['id'], 'status'] = 'Declined'
+                            swap_df.to_csv('data/tool_swaps.csv', index=False)
+                            st.success("Swap declined.")
+                            st.rerun()
+                    
+                    st.divider()
 
 def show_bookings():
     if not st.session_state.user_logged_in:
@@ -1122,3 +1309,5 @@ elif st.session_state.page == 'profile':
     show_profile()
 elif st.session_state.page == 'bookings':
     show_bookings()
+elif st.session_state.page == 'tool_swap':
+    show_tool_swap_page()

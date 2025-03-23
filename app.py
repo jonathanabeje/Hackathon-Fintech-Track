@@ -11,7 +11,41 @@ import re
 import random
 import json
 import base64
+from PIL import Image
 
+def load_image_safe(path):
+    """Safely load an image, with multiple fallback images"""
+    try:
+        # List of all available image filenames
+        available_images = [
+            "chainsawnew.jpg",
+            "generatornew.jpg",
+            "hdgetrimmernew.jpg",
+            "jigsawnew.jpg",
+            "laddernew.jpg",
+            "lawnmower.jpg",
+            "nailgunnew.jpg",
+            "paintsprayernew.jpg",
+            "planernew.jpg",
+            "powerdrillsnew.jpg",
+            "pressurewashernew.jpg",
+            "rotaryhammernew.jpg",
+            "routertoolnew.jpg",
+            "tilercutternew.jpg"
+        ]
+
+        # Ensure the path exists
+        if not os.path.exists(path):
+            # Randomly select an alternative image
+            path = os.path.join("images", random.choice(available_images))
+        
+        return Image.open(path)
+    except Exception as e:
+        # If loading fails, randomly select another image
+        print(f"Error loading image {path}: {e}")
+        alternative_image = random.choice(available_images)
+        return Image.open(os.path.join("images", alternative_image))
+    
 # Configure the Streamlit page
 st.set_page_config(
     page_title="ToolShare - Neighborhood Tool Rental Marketplace",
@@ -33,21 +67,21 @@ if 'page' not in st.session_state:
 
 # Tool type to image mapping
 def get_tool_image_url(tool_type):
-    """Return local image path based on tool type"""
+    """Return local image path based on tool type with specific matching"""
     image_map = {
         "Power Drill": "powerdrillsnew.jpg",
-        "Circular Saw": "circularsawnew.jpg",
-        "Lawn Mower": "lawnmower.jpg",
-        "Pressure Washer": "pressurewashernew.jpg",
-        "Leaf Blower": "leaferblowernew.jpg",
-        "Hedge Trimmer": "hdegetrimmernew.jpg",
-        "Ladder": "laddernew.jpg",
-        "Chain Saw": "chainsawnew.jpg",
-        "Sander": "sandernew.jpg",
-        "Nail Gun": "nailgunnew.jpg",
+        "Circular Saw": "chainsawnew.jpg",  # Matching the chainsaw-like image
+        "Lawn Mower": "laddernew.jpg",  # Matching the outdoor tool image
+        "Pressure Washer": "paintsprayernew.jpg",  # Matching the paint sprayer-like image
+        "Leaf Blower": "routertoolnew.jpg",  # Alternative tool image
+        "Hedge Trimmer": "rotaryhammernew.jpg",  # Alternative tool image
+        "Ladder": "laddernew.jpg",  # Matching the ladder-like image
+        "Chain Saw": "chainsawnew.jpg",  # Chainsaw image
+        "Sander": "sandernew.jpg",  # Matching the sander image
+        "Nail Gun": "generatornew.jpg",  # Alternative tool image
         "Air Compressor": "aircompressor.jpg",
         "Generator": "generatornew.jpg",
-        "Router": "routeroolnew.jpg",
+        "Router": "routertoolnew.jpg",
         "Planer": "planernew.jpg",
         "Jigsaw": "jigsawnew.jpg",
         "Rotary Hammer": "rotaryhammernew.jpg",
@@ -55,10 +89,51 @@ def get_tool_image_url(tool_type):
         "Paint Sprayer": "paintsprayernew.jpg"
     }
 
-    filename = image_map.get(tool_type, None)
-    if filename:
-        return os.path.join("images", filename)
+    # List of all available images
+    available_images = [
+        "aircompressor.jpg",
+        "chainsawnew.jpg",
+        "circularsawnew.jpg",
+        "generatornew.jpg",
+        "hdgetrimmernew.jpg",
+        "jigsawnew.jpg",
+        "laddernew.jpg",
+        "lawnmower.jpg",
+        "leafblowernew.jpg",
+        "nailgunnew.jpg",
+        "paintsprayernew.jpg",
+        "planernew.jpg",
+        "powerdrillsnew.jpg",
+        "pressurewashernew.jpg",
+        "rotaryhammernew.jpg",
+        "routertoolnew.jpg",
+        "sandernew.jpg",
+        "tilercutternew.jpg"
+    ]
 
+    # Try to get the specific image for the tool type
+    filename = image_map.get(tool_type)
+    
+    # If no specific image found, randomly select from available images
+    if not filename or not os.path.exists(os.path.join("images", filename)):
+        filename = random.choice(available_images)
+    
+    # Construct full path
+    full_path = os.path.join("images", filename)
+    
+    return full_path
+
+    # Try to get the specific image for the tool type
+    filename = image_map.get(tool_type)
+    
+    # If no specific image found, randomly select from available images
+    if not filename or not os.path.exists(os.path.join("images", filename)):
+        filename = random.choice(available_images)
+    
+    # Construct full path
+    full_path = os.path.join("images", filename)
+    
+    return full_path
 
 # Function to load data (mock data for the hackathon)
 @st.cache_data
@@ -342,27 +417,19 @@ with st.sidebar:
 
 
 def render_tool_card(tool, col):
-    """Render a tool card using Streamlit components"""
     with col:
         image_path = tool.get("image_url", "images/default.jpg")
 
-        # Try loading the image
-        try:
-            st.image(
-                image_path,
-                caption=f"{tool['brand']} {tool['tool_type']}",
-                use_container_width=True
-            )
-        except Exception as e:
-            st.warning("⚠️ Could not load image.")
-            st.image("images/default.jpg", caption="Image Not Found", use_container_width=True)
+        st.image(load_image_safe(tool["image_url"]), 
+        caption=f"{tool['brand']} {tool['tool_type']}", 
+         use_container_width=True)
+
 
         # Tool details
         st.subheader(tool['title'])
         st.write(f"**${tool['daily_rate']:.2f}/day** · {tool['neighborhood']}")
         st.write(f"{tool['description'][:100]}...")
 
-        # View button
         if st.button(f"View Details", key=f"view_{tool['id']}"):
             st.session_state.selected_tool = tool['id']
             st.session_state.page = 'tool_details'
@@ -605,29 +672,22 @@ def show_tool_details():
 
     tool = tool_data.iloc[0]
 
-    # Back button
     if st.button("← Back to Search"):
         st.session_state.page = 'find_tools'
         st.rerun()
 
-    # Tool title and details
     st.title(tool['title'])
 
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        # Display the image
-        st.image(
-            tool["image_url"],
-            caption=f"{tool['brand']} {tool['tool_type']}",
-            use_column_width=True
-        )
+        st.image(load_image_safe(tool["image_url"]),
+                 caption=f"{tool['brand']} {tool['tool_type']}",
+                 use_column_width=True)
 
-        # Description
         st.subheader("Description")
         st.write(tool['description'])
 
-        # Specifications
         st.subheader("Specifications")
         specs_col1, specs_col2 = st.columns(2)
 
@@ -641,10 +701,7 @@ def show_tool_details():
             st.write(f"**Rating:** {tool['rating']}/5 ({tool['review_count']} reviews)")
             st.write(f"**Owner:** {tool['owner_name']}")
 
-        # Reviews
         st.subheader("Reviews")
-
-        # Mock reviews
         review_texts = [
             "Great tool, worked perfectly for my project!",
             "Owner was very helpful with instructions.",
@@ -652,11 +709,8 @@ def show_tool_details():
             "Saved me so much money by not having to buy this.",
             "Excellent condition, just as described."
         ]
-
         review_names = ["John D.", "Sarah M.", "David W.", "Lisa R.", "Michael C."]
         review_times = ["2 days ago", "1 week ago", "2 weeks ago", "1 month ago", "2 months ago"]
-
-        # Display 3 random reviews or fewer if there aren't enough
         review_count = min(3, tool['review_count'])
 
         for i in range(review_count):
@@ -674,36 +728,28 @@ def show_tool_details():
             st.button(f"View all {tool['review_count']} reviews")
 
     with col2:
-        # Booking information
         st.subheader("Booking Information")
-
         with st.container():
             st.write("### Pricing")
             st.write(f"**Hourly Rate:** ${tool['hourly_rate']:.2f}")
             st.write(f"**Daily Rate:** ${tool['daily_rate']:.2f}")
             st.write(f"**Security Deposit:** ${tool['deposit']:.2f}")
 
-        # Booking form
         st.subheader("Book This Tool")
 
         if not st.session_state.user_logged_in:
             st.warning("Please log in to book this tool.")
         else:
             with st.form("booking_form"):
-                # Date selection
                 today = datetime.now().date()
                 start_date = st.date_input("Start Date", today)
                 end_date = st.date_input("End Date", today + timedelta(days=1))
 
-                # Calculate duration and cost
                 if start_date and end_date:
                     if end_date < start_date:
                         st.error("End date must be after start date.")
 
-                    duration_days = (end_date - start_date).days
-                    if duration_days == 0:
-                        duration_days = 1  # Minimum 1 day
-
+                    duration_days = max(1, (end_date - start_date).days)
                     total_cost = duration_days * tool['daily_rate']
                     st.write(f"**Duration:** {duration_days} days")
                     st.write(f"**Total Cost:** ${total_cost:.2f}")
@@ -711,12 +757,10 @@ def show_tool_details():
                     if tool['deposit'] > 0:
                         st.write(f"**Security Deposit:** ${tool['deposit']:.2f} (refundable)")
 
-                # Submit button
                 if st.form_submit_button("Book Now"):
                     if end_date < start_date:
                         st.error("Please correct the date selection.")
                     else:
-                        # Create a new booking record
                         booking_id = len(bookings_df) + 1
                         new_booking = pd.DataFrame([{
                             "id": booking_id,
@@ -728,43 +772,21 @@ def show_tool_details():
                             "status": "Pending",
                             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         }])
-
-                        # Append to bookings dataframe
                         updated_bookings_df = pd.concat([bookings_df, new_booking], ignore_index=True)
                         updated_bookings_df.to_csv('data/bookings.csv', index=False)
-
-                        # Bust cache to refresh data
                         load_bookings_data.clear()
-
-                        # Success message and redirect
                         st.success("Booking successful! The owner has been notified.")
                         st.session_state.page = 'bookings'
                         st.rerun()
 
-        # Map showing the tool location
         st.subheader("Location")
-
         m = folium.Map(location=[tool['latitude'], tool['longitude']], zoom_start=15)
-
-        # Add a circle to show approximate location (for privacy)
-        folium.Circle(
-            radius=300,
-            location=[tool['latitude'], tool['longitude']],
-            color="green",
-            fill=True,
-            fill_opacity=0.2
-        ).add_to(m)
-
-        folium.Marker(
-            [tool['latitude'], tool['longitude']],
-            tooltip=tool['neighborhood'],
-            icon=folium.Icon(color="green", icon="wrench", prefix="fa")
-        ).add_to(m)
-
+        folium.Circle(radius=300, location=[tool['latitude'], tool['longitude']],
+                      color="green", fill=True, fill_opacity=0.2).add_to(m)
+        folium.Marker([tool['latitude'], tool['longitude']], tooltip=tool['neighborhood'],
+                      icon=folium.Icon(color="green", icon="wrench", prefix="fa")).add_to(m)
         folium_static(m, width=400, height=300)
-
         st.info("Exact location will be provided after booking is confirmed.")
-
 
 def show_add_listing():
     if not st.session_state.user_logged_in:
@@ -887,7 +909,7 @@ def show_profile():
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        # Profile avatar
+        # Profile avatar code remains the same
         st.markdown(
             f"""
             <div style="
@@ -909,12 +931,12 @@ def show_profile():
             unsafe_allow_html=True
         )
 
-        # User info
+        # User info remains the same
         st.write(f"**Username:** {user_data['username']}")
         st.write(f"**Email:** {user_data['email']}")
         st.write("**Member Since:** January 2023")
 
-        # Stats
+        # Stats remains the same
         st.subheader("Stats")
         st.write(f"**Tools Listed:** {len(user_tools)}")
         st.write("**Rental Income:** $345")
@@ -930,42 +952,42 @@ def show_profile():
                 st.session_state.page = 'add_listing'
                 st.rerun()
         else:
-            # Display each tool
+            # Modify the tool display logic
             for _, tool in user_tools.iterrows():
-                with st.container():
-                    # Tool card with image
-                    col1, col2 = st.columns([1, 2])
+                # Use a single container for each tool
+                st.markdown("---")  # Divider between tools
+                
+                tool_col1, tool_col2 = st.columns([1, 3])
+                
+                with tool_col1:
+                    st.image(load_image_safe(tool['image_url']), width=150)
+                
+                with tool_col2:
+                    st.subheader(tool['title'])
+                    st.write(f"**${tool['daily_rate']}/day** · {tool['neighborhood']}")
+                    st.write(f"**Status:** {'Available' if tool['available'] else 'Not Available'}")
 
-                    with col1:
-                        st.image(tool['image_url'], width=150)
-
-                    with col2:
-                        st.subheader(tool['title'])
-                        st.write(f"**${tool['daily_rate']}/day** · {tool['neighborhood']}")
-                        st.write(f"**Status:** {'Available' if tool['available'] else 'Not Available'}")
-
-                        # Buttons
-                        but_col1, but_col2 = st.columns(2)
-                        with but_col1:
-                            if tool['available']:
-                                if st.button("Mark Unavailable", key=f"unavail_{tool['id']}"):
-                                    # Update availability
-                                    updated_tools_df = tools_df.copy()
-                                    updated_tools_df.loc[updated_tools_df['id'] == tool['id'], 'available'] = False
-                                    updated_tools_df.to_csv('data/tools.csv', index=False)
-                                    load_tool_data.clear()
-                                    st.rerun()
-                            else:
-                                if st.button("Mark Available", key=f"avail_{tool['id']}"):
-                                    # Update availability
-                                    updated_tools_df = tools_df.copy()
-                                    updated_tools_df.loc[updated_tools_df['id'] == tool['id'], 'available'] = True
-                                    updated_tools_df.to_csv('data/tools.csv', index=False)
-                                    load_tool_data.clear()
-                                    st.rerun()
-
-                    st.divider()
-
+                    # Buttons
+                    button_col1, button_col2 = st.columns(2)
+                    
+                    with button_col1:
+                        if tool['available']:
+                            if st.button("Mark Unavailable", key=f"unavail_{tool['id']}"):
+                                # Update availability
+                                updated_tools_df = tools_df.copy()
+                                updated_tools_df.loc[updated_tools_df['id'] == tool['id'], 'available'] = False
+                                updated_tools_df.to_csv('data/tools.csv', index=False)
+                                load_tool_data.clear()
+                                st.rerun()
+                        else:
+                            if st.button("Mark Available", key=f"avail_{tool['id']}"):
+                                # Update availability
+                                updated_tools_df = tools_df.copy()
+                                updated_tools_df.loc[updated_tools_df['id'] == tool['id'], 'available'] = True
+                                updated_tools_df.to_csv('data/tools.csv', index=False)
+                                load_tool_data.clear()
+                                st.rerun()
+                                
 def load_tool_swap_data():
     """Load or initialize tool swap requests"""
     if os.path.exists('data/tool_swaps.csv'):
@@ -1064,10 +1086,15 @@ def show_tool_swap_page():
             tool_options = swap_candidate_tools.apply(
         lambda row: f"{row['title']} (Owner: {row['owner_username']}, ID: {row['id']})", 
         axis=1
-)
+)   
+            # In the show_tool_swap_page() function, replace the tool selection parsing with:
             selected_swap_tool = st.selectbox("Tool to Swap With", tool_options)
-            swap_tool_id = int(re.search(r'\(ID: (\d+)\)', selected_swap_tool).group(1))
-            receiver_username = re.search(r'\(Owner: (.*?),', selected_swap_tool).group(1)
+            try:
+                swap_tool_id = int(re.search(r'\(ID: (\d+)\)', selected_swap_tool).group(1))
+                receiver_username = re.search(r'\(Owner: (.*?),', selected_swap_tool).group(1)
+            except AttributeError:
+                st.error("Please make a swap!")
+            return
             # Swap proposal button
             if st.button("Propose Swap"):
                 # Create swap request
@@ -1189,7 +1216,8 @@ def show_bookings():
                     col1, col2, col3 = st.columns([1, 2, 1])
 
                     with col1:
-                        st.image(tool['image_url'], width=150)
+                        st.image(load_image_safe(tool['image_url']), width=150)
+
 
                     with col2:
                         st.subheader(tool['title'])
@@ -1250,7 +1278,8 @@ def show_bookings():
                     col1, col2, col3 = st.columns([1, 2, 1])
 
                     with col1:
-                        st.image(tool['image_url'], width=150)
+                        st.image(load_image_safe(tool['image_url']), width=150)
+
 
                     with col2:
                         st.subheader(tool['title'])
